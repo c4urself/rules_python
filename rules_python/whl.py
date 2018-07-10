@@ -21,6 +21,21 @@ import re
 import zipfile
 
 
+class ZipFilePermissions(zipfile.ZipFile):
+    # Taken from:
+    # https://bugs.python.org/issue15795
+    def extract(self, member, path=None, pwd=None):
+        if not isinstance(member, zipfile.ZipInfo):
+            member = self.getinfo(member)
+
+        if path is None:
+            path = os.getcwd()
+
+        ret_val = self._extract_member(member, path, pwd)
+        attr = member.external_attr >> 16
+        os.chmod(ret_val, attr)
+        return ret_val
+
 class Wheel(object):
 
   def __init__(self, path):
@@ -102,7 +117,7 @@ class Wheel(object):
     return self.metadata().get('extras', [])
 
   def expand(self, directory):
-    with zipfile.ZipFile(self.path(), 'r') as whl:
+    with ZipFilePermissions(self.path(), 'r') as whl:
       whl.extractall(directory)
 
   # _parse_metadata parses METADATA files according to https://www.python.org/dev/peps/pep-0314/
